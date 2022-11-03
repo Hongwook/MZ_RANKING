@@ -1365,17 +1365,17 @@ increase_result = rap_increase_prod(anly_data, final_bcd_stock, invt_data, bcd_p
 ranking_top20 = pd.DataFrame(ranking_result['product_id'][1:top_list_head_num + 1].astype('int'))
 ranking_top20['date'] = datetime.today()
 ranking_top20['main_rec_category'] = '주간 랭킹'
-ranking_top20['location'] = list(range(1, top_list_head_num + 1))
+ranking_top20['location'] = list(range(1, len(ranking_top20)+1))
 
 repurchase_top20 = pd.DataFrame(repurchase_result['product_id'][1:top_list_head_num + 1].astype('int'))
 repurchase_top20['date'] = datetime.today()
 repurchase_top20['main_rec_category'] = '재구매율 높은'
-repurchase_top20['location'] = list(range(1, top_list_head_num + 1))
+repurchase_top20['location'] = list(range(1, len(repurchase_top20)+1))
 
 increase_top20 = pd.DataFrame(increase_result['product_id'][1:top_list_head_num + 1].astype('int'))
 increase_top20['date'] = datetime.today()
 increase_top20['main_rec_category'] = '판매 급상승'
-increase_top20['location'] = list(range(1, top_list_head_num + 1))
+increase_top20['location'] = list(range(1, len(increase_top20)+1))
 
 # 카딜로벨트 필터링 작업 추가
 # 2. 노출(상위 top_list_head_num등)되는 카테고리 하나라도 있으면 그대로 두고, 없으면 판매급상승 1위로.
