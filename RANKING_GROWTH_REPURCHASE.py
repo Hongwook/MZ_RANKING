@@ -541,7 +541,7 @@ def rap_increase_prod(anly_data, final_bcd_stock, invt_data, bcd_prod_df, brand_
     merged_df.sort_values(by='increase_rate', ascending=False, inplace=True)
     merged_df = merged_df[merged_df.latest_qty >= atleast_avgqty]
 
-    merged_df = pd.merge(merged_df, anly_data[['product_id', 'product_name_kor']].drop_duplicates(), how='left')
+    merged_df = pd.merge(merged_df, anly_data[['product_id', 'product_name_kor']].drop_duplicates(subset='product_id', keep='last'), how='left')
     merged_df = pd.merge(merged_df, brand_data, on='product_id', how='left')
     merged_df = pd.merge(merged_df, p_slopes, on='product_id', how='left')
     merged_df = merged_df[~merged_df['brand'].isin(filtered_brand)]
@@ -685,7 +685,7 @@ def repurchase_prod(anly_data, final_bcd_stock, brand_data, main_data, exposed_d
     repurchase_rate['repurchase'] = repurchase_rate.total_purchase - repurchase_rate.first_purchase
     repurchase_rate['repurchase_rate'] = repurchase_rate.repurchase / repurchase_rate.total_purchase
     repurchase_rate.sort_values(by='repurchase_rate', ascending=False, inplace=True)
-    repurchase_rate = pd.merge(repurchase_rate, anly_data[['product_id', 'product_name_kor']].drop_duplicates(),
+    repurchase_rate = pd.merge(repurchase_rate, anly_data[['product_id', 'product_name_kor']].drop_duplicates(subset='product_id', keep='last'),
                                how='left')
     repurchase_rate = repurchase_rate[
         ['product_id', 'product_name_kor', 'repurchase', 'total_purchase', 'repurchase_rate']]
@@ -714,7 +714,7 @@ def repurchase_prod(anly_data, final_bcd_stock, brand_data, main_data, exposed_d
     general_rate = general_rate[general_rate.unique_users >= min_repurchase_user]
     general_rate.sort_values(by='general_repurchase_rate', ascending=False, inplace=True)
     general_rate = pd.merge(general_rate,
-                            anly_data[['product_id', 'product_name_kor', 'category_M', 'category_S']].drop_duplicates(),
+                            anly_data[['product_id', 'product_name_kor', 'category_M', 'category_S']].drop_duplicates(subset='product_id', keep='last'),
                             how='left')
     general_rate = pd.merge(general_rate, brand_data, on='product_id', how='left')
     general_rate = general_rate[~general_rate['brand'].isin(filtered_brand)]
@@ -1116,7 +1116,7 @@ def product_ranking(
     merged_df.sort_values(by='increase_rate', ascending=False, inplace=True)
     merged_df = merged_df[merged_df.latest_qty >= atleast_avgqty]
 
-    merged_df = pd.merge(merged_df, anly_data[['product_id', 'product_name_kor']].drop_duplicates(), how='left')
+    merged_df = pd.merge(merged_df, anly_data[['product_id', 'product_name_kor']].drop_duplicates(subset='product_id', keep='last'), how='left')
     merged_df = pd.merge(merged_df, brand_data, on='product_id', how='left')
     merged_df = pd.merge(merged_df, ltg_data, on='product_id', how='left')
     merged_df = pd.merge(merged_df, quatly_ltg_data, on='product_id', how='left')
