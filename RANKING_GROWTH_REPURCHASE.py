@@ -85,7 +85,6 @@ products_data = pd.read_sql('''
 SELECT a.product_id, a.is_edp, a.status, a.hash_tag
 FROM cscart_products a;
 ''', con=db)
-products_data.rename(columns={'product_id': 'object_id'}, inplace=True)
 
 # inventory table
 invt_data = pd.read_sql('''
@@ -238,7 +237,6 @@ main_data.date = pd.to_datetime(main_data.date).dt.normalize()
 
 # 2. match column names
 review_data.rename(columns={'object_id': 'product_id'})
-products_data.rename(columns={'object_id': 'product_id'})
 
 # 3. review text preprocessing
 review_data.message = review_data.message.apply(lambda x: str(x))  # 일부 row가 float 형태로 입력
@@ -431,6 +429,27 @@ def conditional_filtering(df, condition_prods=[314], min_turnover=21):
     exposed_df = exposed_df[exposed_df['노출후상승률'] >= 1]
     df = pd.concat([unexposed_df, exposed_df, cond_df])
     return df
+
+
+# 상품 상태가 'A'인 상품들만 필터링
+def filter_prod_status(target_df):
+    temp_df = pd.merge(target_df, products_data[['product_id', 'status']], on='product_id', how='left')
+    temp_df = temp_df[~(temp_df['status'].isin(['D', 'H']))]
+    temp_df = temp_df.drop('status', axis=1)
+    return temp_df
+
+
+# 리스트에 있는 상품들 중 판매량이 높은 상품만 노출되도록 하는 기능 추가
+def filter_substitute_prod(target_df, target_list):
+    """
+    target_list에 있는 상품들 중 가장 판매량이 높은 상품만 남기고 다른 상품은 분석대상 데이터프레임에서 제외하는 함수
+    """
+    temp_df = target_df[target_df['purchased_at']>=(datetime.now()-timedelta(days=90)).strftime('%Y-%m-%d')]
+    temp_df = temp_df[temp_df['product_id'].isin(target_list)]
+    gr_sum = temp_df.groupby('product_id')['product_qty'].sum()
+    del_list = gr_sum[gr_sum!=gr_sum.max()].index.values
+    filtered_df = target_df[~(target_df['product_id'].isin(del_list))]
+    return filtered_df
 
 
 def filtering_rap_increase(final_df):
@@ -1316,6 +1335,11 @@ def product_ranking(
     final_df = get_final_score(final_df, plus_cols, minus_dict, plus_dict, filename_prefix, head_num)
     return final_df
 
+# C4 60, 30중 최근 한달간 판매량이 더 많은 상품만 남기고 분석대상에서 제거하는 과정 추가
+c4_list = [4109, 2674]
+anly_data = filter_substitute_prod(anly_data, c4_list)
+# 상품상태가 'D', 'H'인 상품들 제외
+anly_data = filter_prod_status(anly_data)
 
 # 메인추천카테고리 상품 중복 제거 (우선순위: 랭킹 > 재구매 > 판매급상승)
 whole_head_num = 50  # 메인카테고리 상품 중복 제거 작업 후 head number. 몇 개 뽑을 것인지
@@ -1399,9 +1423,9 @@ elif ((cardillo_invt['amount'] > 0).sum() >= 1) & (314 not in exp_1):  # 재고�
     increase_result = pd.concat([increase_benchmark, increase_cardilo, increase_lefts])
 else:  # 재고가 없어서 안나왔으면 그냥 패스
     pass
-# raw data를 저장하는 각 카테고리의 테이블에서도 카딜로벨트를 복구할 수는 없음 
-# 산출 시 이미 head_num으로 필터링 후 작업하기 때문에 항상 head_num을 None으로 하지 않으면 불가능함. 
-# 만약 head_num을 None으로 한다면, 각 테이블의 행수는 산출되는 상품수만큼 늘어나게 될 것 
+# raw data를 저장하는 각 카테고리의 테이블에서도 카딜로벨트를 복구할 수는 없음
+# 산출 시 이미 head_num으로 필터링 후 작업하기 때문에 항상 head_num을 None으로 하지 않으면 불가능함.
+# 만약 head_num을 None으로 한다면, 각 테이블의 행수는 산출되는 상품수만큼 늘어나게 될 것
 # → 복구처리 완료
 
 # 3. 급상승결과-2(카딜로 처리로 인한 구분 처리)
