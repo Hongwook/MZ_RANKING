@@ -387,8 +387,9 @@ tot_effect['exposed_effect'] = np.round(tot_effect['exposed_effect'], 2)
 exposed_data = pd.merge(start_exposure, tot_effect, on='product_id')
 exposed_data.columns = ['product_id', '최근노출영역', '연속노출시작일자', '노출후상승률']
 
-# 필터링할 브랜드 명
-filtered_brand = ['Jan Tana']
+# 필터링할 상품
+filtering_brand = ['Jan Tana']
+filtering_prod = [5376]
 
 
 ### FUNCTIONS ###
@@ -410,7 +411,7 @@ def process(x):
         return huber.coef_[0]
 
 
-def conditional_filtering(df, condition_prods=[314], min_turnover=21):
+def conditional_filtering(df, min_turnover, condition_prods=[314]):
     '''
     카딜로 이슈처럼 사전에 필터링 하지 못하고, 특정 상품들을 위해 후처리 필터링 하는 임시 함수(22.08.28)
     '''
@@ -452,7 +453,7 @@ def filter_substitute_prod(target_df, target_list):
     return filtered_df
 
 
-def filtering_rap_increase(final_df):
+def filtering_rap_increase(final_df, min_turnover):
     '''
     (삭제)조건0. 1st, 2nd 옵션의 판매비중 합이 0.5 이하인 골고루 팔리는 상품은 재고필터링에서 제외한다.(22.02.14추가)
     (작업위치변경)조건1. 1st, 2nd 옵션의 재고 전환일수가 적어도 둘 중 하나는 DIO_days 이상이어야 한다.
@@ -468,7 +469,7 @@ def filtering_rap_increase(final_df):
     #     exposed_df = df[df['최근노출영역'].notnull()]
     #     exposed_df = exposed_df[exposed_df['노출후상승률'] >= 1]
     #     df = pd.concat([unexposed_df, exposed_df])
-    df = conditional_filtering(df)
+    df = conditional_filtering(df, min_turnover=0)
     # 조건3. 해당 상품들을 판매량 상승률 기준으로 정렬한다.
     df = df.sort_values(by='판매량상승률', ascending=False).reset_index(drop=True)
 
@@ -488,7 +489,7 @@ def filtering_rap_increase(final_df):
 def rap_increase_prod(anly_data, final_bcd_stock, invt_data, bcd_prod_df, brand_data, main_data, exposed_data,
                       price_compare,
                       today='latest', latest_Ndays=7, compare_Ndays=28, atleast_avgqty=0,
-                      atleast_Nqty=6, head_num=None):
+                      atleast_Nqty=6, head_num=None, min_turnover=0):
     '''
     anly_data: 판매 데이터
     final_bcd_stock: 위의 0.공통처리한 상품별 재고정보 담고있는 테이블
@@ -563,7 +564,7 @@ def rap_increase_prod(anly_data, final_bcd_stock, invt_data, bcd_prod_df, brand_
     merged_df = pd.merge(merged_df, anly_data[['product_id', 'product_name_kor']].drop_duplicates(subset='product_id', keep='last'), how='left')
     merged_df = pd.merge(merged_df, brand_data, on='product_id', how='left')
     merged_df = pd.merge(merged_df, p_slopes, on='product_id', how='left')
-    merged_df = merged_df[~merged_df['brand'].isin(filtered_brand)]
+    merged_df = merged_df[~merged_df['brand'].isin(filtering_brand)]
     #     merged_df = merged_df[['product_id', 'product_name_kor', 'brand', 'latest_qty', 'compare_qty', 'increase_rate']]
 
     # 자릿수 줄이기
@@ -611,7 +612,7 @@ def rap_increase_prod(anly_data, final_bcd_stock, invt_data, bcd_prod_df, brand_
 
     final_df = pd.merge(final_df, exposed_data, on='product_id', how='left')
 
-    final_df = filtering_rap_increase(final_df)
+    final_df = filtering_rap_increase(final_df, min_turnover=0)
     final_df.drop_duplicates(subset='product_id', inplace=True)
     if head_num == None:
         final_df = final_df
@@ -736,7 +737,7 @@ def repurchase_prod(anly_data, final_bcd_stock, brand_data, main_data, exposed_d
                             anly_data[['product_id', 'product_name_kor', 'category_M', 'category_S']].drop_duplicates(subset='product_id', keep='last'),
                             how='left')
     general_rate = pd.merge(general_rate, brand_data, on='product_id', how='left')
-    general_rate = general_rate[~general_rate['brand'].isin(filtered_brand)]
+    general_rate = general_rate[~general_rate['brand'].isin(filtering_brand)]
     general_rate = general_rate[
         ['product_id', 'product_name_kor', 'brand', 'category_M', 'category_S', 'unique_users', 'total_repurchase',
          'general_repurchase_rate']]
@@ -1139,7 +1140,7 @@ def product_ranking(
     merged_df = pd.merge(merged_df, brand_data, on='product_id', how='left')
     merged_df = pd.merge(merged_df, ltg_data, on='product_id', how='left')
     merged_df = pd.merge(merged_df, quatly_ltg_data, on='product_id', how='left')
-    merged_df = merged_df[~merged_df['brand'].isin(filtered_brand)]
+    merged_df = merged_df[~merged_df['brand'].isin(filtering_brand)]
     #     merged_df = merged_df[['product_id', 'product_name_kor', 'brand', 'latest_qty', 'compare_qty', 'increase_rate']]
 
     # 자릿수 줄이기
@@ -1340,26 +1341,29 @@ c4_list = [4109, 2674]
 anly_data = filter_substitute_prod(anly_data, c4_list)
 # 상품상태가 'D', 'H'인 상품들 제외
 anly_data = filter_prod_status(anly_data)
+# 특정 상품 제외
+anly_data = anly_data[~anly_data['product_id'].isin(filtering_prod)]
 
 # 메인추천카테고리 상품 중복 제거 (우선순위: 랭킹 > 재구매 > 판매급상승)
 whole_head_num = 50  # 메인카테고리 상품 중복 제거 작업 후 head number. 몇 개 뽑을 것인지
 top_list_head_num = 15  # whole_head_num는 3개 각 테이블의 raw 결과시트용 순위이고, 이 순위는 노출 순위 시 앞선 우선순위 카테고리를 고려하기 위한 순위
 
+
 # 1. 랭킹결과
 plus_cols = ['최근7일 일평균판매량', '일주일상승률', '분기상승률', '연상승률',
              '재구매지수', '검색유입수']
 minus_dict = {'부정리뷰(3점이하)': 2}  # 감점컬럼 및 배수
-plus_dict = {'최근7일 일평균판매량': 3}  # 가중치컬럼 및 배수
+plus_dict = {'최근7일 일평균판매량': 4}  # 가중치컬럼 및 배수
 ranking_result = product_ranking(anly_data, review_data, invt_data, final_bcd_stock, bcd_prod_df, brand_data, main_data,
                                  search_data,
                                  plus_cols, minus_dict, plus_dict, price_compare, exposed_data,
-                                 min_turnover=21, head_num=whole_head_num)
+                                 min_turnover=0, head_num=whole_head_num)
 # 랭킹에 등장한 상품 리스트(이 때는 전체 50개를 고려하는게 아니라, 노출되는 top_list_head_num만 고려)
 rank_prods = ranking_result.drop('benchmark', axis=0).head(top_list_head_num)['product_id'].unique()
 
 # 2. 재구매결과
 repurchase_result = repurchase_prod(anly_data, final_bcd_stock, brand_data, main_data, exposed_data, price_compare,
-                                    target_period=90, head_num=None)
+                                    target_period=90, head_num=None, min_turnover=21)
 repurchase_result = repurchase_result[~repurchase_result['product_id'].isin(rank_prods)].head(
     whole_head_num + 1)  # 랭킹 리스트에 등장한 상품 제외
 repurchase_result.index = ['benchmark'] + list(range(1, len(repurchase_result)))  # 인덱스 수정
@@ -1483,7 +1487,7 @@ cscart_main_recommend_increase.columns = [
 cscart_main_recommend_ranking['REPCHS_INDEX'] = np.round(cscart_main_recommend_ranking['REPCHS_INDEX'], 4)
 cscart_main_recommend_ranking['AVG_RATING'] = np.round(cscart_main_recommend_ranking['AVG_RATING'], 4)
 
-cscart_main_recommend_repurchase['REPCHS_INDEX'] = np.round(cscart_main_recommend_repurchase['REPCHS_INDEX'], 4)
+cscart_main_recommend_repur⟶⟶chase['REPCHS_INDEX'] = np.round(cscart_main_recommend_repurchase['REPCHS_INDEX'], 4)
 
 # file save
 today = datetime.today().strftime('%Y%m%d')
